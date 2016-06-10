@@ -164,7 +164,7 @@ class p_haul_type:
 		self.kill_last_docker_daemon()
 
 		# start docker daemon in background
-		sp.Popen([docker_bin, "daemon", "-s", "aufs"],
+		sp.Popen([docker_bin, "daemon", "-D", "-s", "aufs"],
 			stdout = logf, stderr = logf)
 		# daemon.wait() TODO: docker daemon not return
 		time.sleep(2)
