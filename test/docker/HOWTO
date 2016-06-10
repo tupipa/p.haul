@@ -12,14 +12,13 @@ your running containers.
    Refer to step 0 in test/mtouch/HOWTO about the pacekages for CRIU and p.haul.
 
    The docker version that supports checkpoint and restore can be obtained by
+   downloading the pre-compiled binary here:
 
-   # git clone https://github.com/huikang/docker.git
-   # cd docker.git
-   # git checkout cr-combined-1006
+   https://github.com/boucher/docker/releases/tag/v1.10_2-16-16-experimental
 
-   On both nodes, compile and store the the docker binary as
+   On both nodes, store the the docker binary as
 
-   /usr/bin/docker-1.9.0-dev
+   /usr/bin/docker
 
    Note that the path above is for now hard-coded in p_haul_docker.py
 
@@ -48,11 +47,11 @@ your running containers.
 
    a) Start the docker daemon
 
-   # /usr/bin/docker-1.9.0-dev daemon -s aufs
+   # docker daemon -s aufs
 
    b) Start the container
 
-   # /usr/bin/docker-1.9.0-dev run -d busybox:latest /bin/sh -c 'i=0; while true; do echo $i >> /foo; i=$(expr $i + 1); sleep 1; done'
+   # docker run -d busybox:latest /bin/sh -c 'i=0; while true; do echo $i >> /foo; i=$(expr $i + 1); sleep 1; done'
 
    This command will return the container's ID, e.g.,  d78.
    (borrowed from https://criu.org/Docker)
@@ -71,8 +70,8 @@ your running containers.
 
    When the command returns, on the destination node run
 
-   [dst]# /usr/bin/docker-1.9.0-dev ps
-   [dst]# /usr/bin/docker-1.9.0-dev exec d78 cat /foo
+   [dst]# docker ps
+   [dst]# docker exec d78 cat /foo
 
    to verify the counter is continuously being incremented.
 

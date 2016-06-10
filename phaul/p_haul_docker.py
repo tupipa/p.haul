@@ -16,8 +16,8 @@ from subprocess import PIPE
 
 
 # Some constants for docker
-docker_bin = "/usr/bin/docker-1.9.0-dev"
-docker_dir = "/var/lib/docker/"
+docker_bin = "/usr/bin/docker"
+docker_dir = "/var/lib/docker/0.0/"
 docker_run_meta_dir = "/var/run/docker/execdriver/native"
 
 
@@ -52,9 +52,13 @@ class p_haul_type:
 		# Each docker container has 3 directories that need to be
 		# migrated: (1) root filesystem, (2) container configuration,
 		# (3) runtime meta state
-		self._ct_rootfs = os.path.join(docker_dir, "aufs/mnt", self.full_ctid)
 		self._ct_config_dir = os.path.join(docker_dir, "containers", self.full_ctid)
 		self._ct_run_meta_dir = os.path.join(docker_run_meta_dir, self.full_ctid)
+
+		with open(os.path.join(self._ct_run_meta_dir, "state.json")) as data_file:
+			data = json.load(data_file)
+			self._ct_rootfs = data["config"]["rootfs"]
+
 		logging.info("Container rootfs: %s", self._ct_rootfs)
 		logging.info("Container config: %s", self._ct_config_dir)
 		logging.info("Container meta: %s", self._ct_run_meta_dir)
