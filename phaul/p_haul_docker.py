@@ -63,6 +63,7 @@ class p_haul_type:
 	def __load_ct_config(self):
 		self._ct_config_dir = os.path.join(docker_dir, "containers", self.full_ctid)
 		self._ct_run_meta_dir = os.path.join(docker_run_meta_dir, self.full_ctid)
+		self._ct_image_db = os.path.join(docker_dir, "image", "aufs", "layerdb", "mounts", self.full_ctid)
 		logging.info("Container config: %s", self._ct_config_dir)
 		logging.info("Container meta: %s", self._ct_run_meta_dir)
 
@@ -81,7 +82,7 @@ class p_haul_type:
 
 	def get_fs(self, fdfs=None):
 		# use rsync for rootfs and configuration directories
-		return fs_haul_subtree.p_haul_fs([self._ct_rootfs, self._ct_config_dir])
+		return fs_haul_subtree.p_haul_fs([self._ct_rootfs, self._ct_config_dir, self._ct_image_db])
 
 	def get_fs_receiver(self, fdfs=None):
 		return None
@@ -133,6 +134,7 @@ class p_haul_type:
 
 		self.__load_ct_config()
 		os.makedirs(self._ct_run_meta_dir)
+		os.makedirs(self._ct_image_db)
 		pd = sp.Popen(["cp", os.path.join(dir, "state.json"), self._ct_run_meta_dir], stdout = PIPE)
 		pd.wait()
 
