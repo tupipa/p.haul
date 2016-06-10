@@ -134,7 +134,6 @@ class p_haul_type:
 
 		self.__load_ct_config()
 		os.makedirs(self._ct_run_meta_dir)
-		os.makedirs(self._ct_image_db)
 		pd = sp.Popen(["cp", os.path.join(dir, "state.json"), self._ct_run_meta_dir], stdout = PIPE)
 		pd.wait()
 
