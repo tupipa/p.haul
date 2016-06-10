@@ -34,7 +34,8 @@ class p_haul_type:
 
 	def init_src(self):
 		self.full_ctid = self.get_full_ctid()
-		self.__load_ct_config(docker_dir)
+		self.__load_ct_config()
+		self.__load_ct_rootfs()
 
 	def init_dst(self):
 		pass
@@ -47,19 +48,21 @@ class p_haul_type:
 		# Do we need this for Docker?
 		return self.full_ctid
 
-	def __load_ct_config(self, path):
+	# Each docker container has 3 directories that need to be
+	# migrated: (1) root filesystem, (2) container configuration,
+	# (3) runtime meta state. We have to do this in two steps on
+	# restore, so it is separated into two methods.
 
-		# Each docker container has 3 directories that need to be
-		# migrated: (1) root filesystem, (2) container configuration,
-		# (3) runtime meta state
-		self._ct_config_dir = os.path.join(docker_dir, "containers", self.full_ctid)
-		self._ct_run_meta_dir = os.path.join(docker_run_meta_dir, self.full_ctid)
-
+	def __load_ct_rootfs(self):
 		with open(os.path.join(self._ct_run_meta_dir, "state.json")) as data_file:
 			data = json.load(data_file)
 			self._ct_rootfs = data["config"]["rootfs"]
-
 		logging.info("Container rootfs: %s", self._ct_rootfs)
+
+
+	def __load_ct_config(self):
+		self._ct_config_dir = os.path.join(docker_dir, "containers", self.full_ctid)
+		self._ct_run_meta_dir = os.path.join(docker_run_meta_dir, self.full_ctid)
 		logging.info("Container config: %s", self._ct_config_dir)
 		logging.info("Container meta: %s", self._ct_run_meta_dir)
 
@@ -128,10 +131,12 @@ class p_haul_type:
 			data = json.load(data_file)
 		self.full_ctid = data["id"]
 
-		self.__load_ct_config(docker_dir)
+		self.__load_ct_config()
 		os.makedirs(self._ct_run_meta_dir)
 		pd = sp.Popen(["cp", os.path.join(dir, "state.json"), self._ct_run_meta_dir], stdout = PIPE)
 		pd.wait()
+
+		self.__load_ct_rootfs()
 
 	def kill_last_docker_daemon(self):
 		p = sp.Popen(['pgrep', '-l', docker_bin], stdout=sp.PIPE)
