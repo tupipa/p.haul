@@ -17,6 +17,7 @@ class _rpc_proxy_caller:
 		raw_data = repr(call)
 		self._rpc_sk.send(raw_data)
 		raw_data = self._rpc_sk.recv(xem_rpc.rpc_sk_buf)
+		# logging.info("Lele: rpc_proxy_caller: _rpc_sk.recv() get data")
 		resp = eval(raw_data)
 
 		if resp[0] == xem_rpc.RPC_RESP:

@@ -9,7 +9,11 @@ import criu_api
 import criu_req
 import htype
 import iters
+import time
 
+import subprocess as sp
+
+docker_bin='/usr/bin/docker'
 
 class phaul_service:
 	def __init__(self, connection):
@@ -21,6 +25,7 @@ class phaul_service:
 		self.__mode = iters.MIGRATION_MODE_LIVE
 		self.dump_iter_index = 0
 		self.restored = False
+		self._nocompression = False
 
 	def on_connect(self):
 		logging.info("Connected")
@@ -36,8 +41,8 @@ class phaul_service:
 			elif iters.is_restart_mode(self.__mode):
 				self.htype.stop(True)
 
-		if self.__fs_receiver:
-			self.__fs_receiver.stop_receive()
+		#if self.__fs_receiver:
+		#	self.__fs_receiver.stop_receive()
 
 		if self.img:
 			logging.info("Closing images")
@@ -48,17 +53,28 @@ class phaul_service:
 	def rpc_setup(self, htype_id, mode):
 
 		logging.info("Setting up service side %s", htype_id)
+		startTime = time.time()
 		self.__mode = mode
 
 		self.htype = htype.get_dst(htype_id)
 
 		self.__fs_receiver = self.htype.get_fs_receiver(self.connection.fdfs)
-		if self.__fs_receiver:
-			self.__fs_receiver.start_receive()
+		#if self.__fs_receiver:
+		#	self.__fs_receiver.start_receive()
 
 		if iters.is_live_mode(self.__mode):
 			self.img = images.phaul_images("rst")
 			self.criu_connection = criu_api.criu_conn(self.connection.mem_sk)
+		
+		# lele: parse the third elements in htype_id[2]=layer_stackIDs
+		# if htype_id[0] == 'docker':
+		# 	logging.info("lele: target side: setting up docker...")
+		# 	self.htype.setup_docker_layers(htype_id[2])
+		# else:
+		# 	raise Exception("something went wrong. not using with Docker? ")
+		endTime = time.time()
+		timing = endTime - startTime
+		logging.info("server side: setting up time: %s", str(timing))
 
 	def rpc_set_options(self, opts):
 		self.htype.set_options(opts)
@@ -66,6 +82,12 @@ class phaul_service:
 			self.criu_connection.set_options(opts)
 		if self.img:
 			self.img.set_options(opts)
+		self._nocompression = opts ["nocompression"]
+		logging.info("server set options done. nocompression: " + str(self._nocompression))
+
+	def rpc_setup_docker_layers(self, layerIDs_stack):
+		logging.info("lele: compression mode: setting up docker layers...")
+		self.htype.setup_docker_layers(layerIDs_stack)
 
 	def start_page_server(self):
 		logging.info("Starting page server for iter %d", self.dump_iter_index)
@@ -87,11 +109,27 @@ class phaul_service:
 	def rpc_end_iter(self):
 		pass
 
+	#lele: add for dirs pack and sync
+	def rpc_start_accept_dirs(self, dir_name):
+		self.__fs_receiver.start_accept_dirs(dir_name, self.connection.mem_sk)
+
+	def rpc_stop_accept_dirs(self):
+		self.__fs_receiver.stop_accept_dirs()
+
 	def rpc_start_accept_images(self, dir_id):
 		self.img.start_accept_images(dir_id, self.connection.mem_sk)
 
+	def rpc_start_accept_images_compress(self, dir_id):
+		self.img.start_accept_images_compress(dir_id, self.connection.mem_sk)
+
+	def rpc_get_target_image_dir(self, dir_id):
+		return self.img.get_target_image_dir(dir_id)
+
 	def rpc_stop_accept_images(self):
 		self.img.stop_accept_images()
+
+	def rpc_stop_accept_images_compress(self):
+		self.img.stop_accept_images_compress()
 
 	def rpc_check_cpuinfo(self):
 		logging.info("Checking cpuinfo")
@@ -112,16 +150,63 @@ class phaul_service:
 		logging.info("\t`- %s", result)
 		return result
 
+	def rpc_reload_docker_daemon_no_block(self):
+		restore_log = "/tmp/docker_daemon_reload.log"
+		# logf = open(restore_log, "w+")
+		startRL=time.time()
+		logf = open(restore_log, "w+")
+
+		# if self._nocompression:
+		# 	# Kill any previous docker daemon in order to reload the
+		# 	# status of the migrated container
+		# 	logging.info("legacy mode: kill docker daemon")
+		# 	self.htype.kill_last_docker_daemon()	# start docker daemon in background
+		# else:
+		# 	logging.info("new mode: don't kill docker daemon")
+
+		logging.info("always kill docker daemon to avoid zombie processes.")
+		self.htype.kill_last_docker_daemon()	# start docker daemon in background
+		logging.info("restart docker daemon...")
+		# sp.Popen([docker_bin, "daemon", "-D", "-s", "aufs"],
+		# 	stdout = logf, stderr = logf)
+		sp.Popen([docker_bin, "daemon", "-s", "aufs"],
+			stdout = logf, stderr = logf)
+		# sp.Popen([docker_bin, "daemon", "-D", "-s", "aufs"])
+		# daemon.wait() TODO: docker daemon not return
+		# time.sleep(2)
+		self.reloadTime = time.time() - startRL
+		logging.info("done reload docker daemon")
+
+
+	def rpc_reload_time(self):
+		# stats = criu_api.criu_get_rstats(self.img)
+		# return stats.restore_time
+		return self.reloadTime
+
 	def rpc_restore_from_images(self):
 		logging.info("Restoring from images")
-		self.htype.put_meta_images(self.img.image_dir())
+		startRS=time.time()
+		if self._nocompression:
+			self.htype.put_meta_images(self.img.image_dir())
 		self.htype.final_restore(self.img, self.criu_connection)
+		self.restoreTime = time.time() - startRS
 		logging.info("Restore succeeded")
 		self.restored = True
 
+
 	def rpc_restore_time(self):
-		stats = criu_api.criu_get_rstats(self.img)
-		return stats.restore_time
+		# stats = criu_api.criu_get_rstats(self.img)
+		# return stats.restore_time
+		return self.restoreTime
+	
+	def rpc_apply_diff_images(self):
+		logging.info("Apply diff images")
+		self.img.apply_mem_diff()
+
+	def rpc_diff_apply_time(self):
+		# stats = criu_api.criu_get_rstats(self.img)
+		# return stats.restore_time
+		return self.img.apply_diff_time
 
 	def rpc_start_htype(self):
 		logging.info("Starting")
@@ -130,4 +215,4 @@ class phaul_service:
 		self.restored = True
 
 	def rpc_migration_complete(self, src_data):
-		self.htype.target_cleanup(src_data)
+		self.htype.target_cleanup(self.img)

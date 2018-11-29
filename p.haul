@@ -24,10 +24,13 @@ import phaul.connection
 
 # Parse arguments
 args = phaul.args_parser.parse_client_args()
-
-# Configure logging
+print(args.docker_image)
+# # Configure logging
+# logging.basicConfig(filename=args.log_file, filemode="a", level=logging.INFO,
+# 	format="%(asctime)s.%(msecs)03d: %(process)d: %(message)s",
+# 	datefmt="%H:%M:%S")
 logging.basicConfig(filename=args.log_file, filemode="a", level=logging.INFO,
-	format="%(asctime)s.%(msecs)03d: %(process)d: %(message)s",
+	format="%(asctime)s.%(msecs)03d:" + args.docker_image + ":%(process)d: %(message)s",
 	datefmt="%H:%M:%S")
 
 # Setup hook to log uncaught exceptions
@@ -42,8 +45,8 @@ connection = phaul.connection.establish(args.fdrpc, args.fdmem, args.fdfs)
 # Start the migration
 ph_type = args.type, args.id
 worker = phaul.iters.phaul_iter_worker(ph_type, args.dst_id, args.mode,
-	connection)
-worker.set_options(vars(args))
+	connection, vars(args))
+# worker.set_options(vars(args))
 worker.start_migration()
 
 # Close connection

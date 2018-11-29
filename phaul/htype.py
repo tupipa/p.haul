@@ -51,6 +51,8 @@ def __get(id):
 	hauler_module = __get_module(hauler_name)
 	logging.debug("%s hauler imported from %s", hauler_name,
 		hauler_module.__file__)
+	logging.info("%s hauler imported from %s", hauler_name,
+		hauler_module.__file__)
 	return hauler_module.p_haul_type(haulee_id)
 
 
